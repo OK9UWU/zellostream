@@ -97,7 +97,7 @@ def get_config():
 
 	return config
 
-if config[serial_ptt]:
+if config["serial_ptt"]:
 	rtsptt = serial.Serial(port=config["serial_port"],rtscts=True)
 
 
