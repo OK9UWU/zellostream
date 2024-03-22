@@ -16,6 +16,7 @@ from threading import Thread,Lock
 import traceback
 import os
 import librosa
+import serial
 
 logging.basicConfig(format='%(asctime)s %(levelname).1s %(funcName)s: %(message)s', level=logging.INFO)
 LOG = logging.getLogger('Zellostream')
@@ -86,6 +87,8 @@ def get_config():
 	config["udp_port"] = configdata.get("UDP_PORT",9123)
 	config["tgid_in_stream"] = configdata.get("TGID_in_stream",False)
 	config["tgid_to_play"] = configdata.get("TGID_to_play",70000)
+	config["serial_ptt"] = configdata.get("ptt_serial", False)
+	config["serial_port"] = configdata.get("ptt_device")
 	zello_work = configdata.get("zello_work_account_name")
 	if zello_work:
 		config["zello_ws_url"] = "wss://zellowork.io/ws/" + zello_work
@@ -93,6 +96,9 @@ def get_config():
 		config["zello_ws_url"] = "wss://zello.io/ws"
 
 	return config
+
+if config[serial_ptt]:
+	rtsptt = serial.Serial(port=config["serial_port"],rtscts=True)
 
 
 def create_zello_jwt(config):
@@ -467,6 +473,9 @@ def stream_from_zello(config, zello_ws, audio_output_stream, start_data):
 	)
 	if config["ptt_command_support"]:
 		run_ptt_command("PTT on", config["ptt_on_command"], 0)
+	if config["serial_ptt"]:
+		rtsptt.rts = True
+
 	while True:
 		try:
 			received = zello_ws.recv()
@@ -490,11 +499,15 @@ def stream_from_zello(config, zello_ws, audio_output_stream, start_data):
 				LOG.info("end of bytes stream")
 				if config["ptt_command_support"]:
 					run_ptt_command("PTT off", config["ptt_off_command"], config["ptt_off_delay"])
+				if config["serial_ptt"]:
+					rtsptt.rts = False
 				return # can only be an on_stream_stop if not binary
 		except Exception as ex:
 			LOG.error("exception: %s", ex)
 			if config["ptt_command_support"]:
 				run_ptt_command("PTT off", config["ptt_off_command"], config["ptt_off_delay"])
+			if config["serial_ptt"]:
+				rtsptt.rts = False
 			return
 
 
